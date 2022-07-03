@@ -4,6 +4,7 @@ set -Eeuxo pipefail
 
 pushd "$(dirname "$0")" >/dev/null
 
+go mod tidy
 go build -o journald-exporter-oci
 
 popd >/dev/null
