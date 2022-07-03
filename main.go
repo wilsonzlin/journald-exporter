@@ -266,12 +266,13 @@ func main() {
 			// Send the request using the service client
 			_, err = client.PutLogs(context.Background(), req)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to PutLogs %d entries: %s\n", entryCount, err)
 				delay = delay * 2
 				if delay > MAX_DELAY {
 					delay = MAX_DELAY
 				}
-				fmt.Fprintf(os.Stderr, "Failed to PutLogs: %s\n", err)
 			} else {
+				fmt.Fprintf(os.Stderr, "Successfully uploaded %d entries\n", entryCount)
 				delay = MIN_DELAY
 				if stateDb != nil {
 					_, err = stateDb.Exec("insert into exported (instance, last_cursor) values (?, ?) on conflict (instance) do update set last_cursor = excluded.last_cursor", args.InstanceOcid, entriesBatch[entryCount-1].Id)
