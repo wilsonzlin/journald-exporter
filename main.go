@@ -157,9 +157,9 @@ type EntryData struct {
 
 func main() {
 	var args struct {
-		LogOcid      string
-		InstanceOcid string
-		StateDb      string
+		LogOcid      string `long:"log-ocid"`
+		InstanceOcid string `long:"instance-ocid"`
+		State        string `long:"state"`
 	}
 	_, err := flags.ParseArgs(&args, os.Args[1:])
 	if err != nil {
@@ -169,8 +169,8 @@ func main() {
 	// We use SQLite3 for safer consistent writes.
 	// We use "instance" because we need a PK, even though we'll only ever have one row.
 	var stateDb *sql.DB
-	if args.StateDb != "" {
-		stateDb, err = sql.Open("sqlite3", args.StateDb)
+	if args.State != "" {
+		stateDb, err = sql.Open("sqlite3", args.State)
 		if err != nil {
 			panic(err)
 		}
