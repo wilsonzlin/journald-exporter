@@ -5,6 +5,7 @@ set -Eeuxo pipefail
 pushd "$(dirname "$0")" >/dev/null
 
 go mod tidy
-go build -o journald-exporter-oci
+# Create fully static binaries to avoid any compatibility issues and allow extremely simple download-and-run usage.
+CGO_ENABLED=0 go build -o journald-exporter-oci
 
 popd >/dev/null
