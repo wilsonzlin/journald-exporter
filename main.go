@@ -272,7 +272,6 @@ func main() {
 					delay = MAX_DELAY
 				}
 			} else {
-				fmt.Fprintf(os.Stderr, "Successfully uploaded %d entries\n", entryCount)
 				delay = MIN_DELAY
 				if stateDb != nil {
 					_, err = stateDb.Exec("insert into exported (instance, last_cursor) values (?, ?) on conflict (instance) do update set last_cursor = excluded.last_cursor", args.InstanceOcid, entriesBatch[entryCount-1].Id)
