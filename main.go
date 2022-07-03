@@ -150,9 +150,9 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 }
 
 type EntryData struct {
-	Field    map[string]string
-	Message  string
-	Priority uint64
+	Field    map[string]string `json:"field"`
+	Message  string            `json:"message"`
+	Priority uint64            `json:"priority"`
 }
 
 func main() {
