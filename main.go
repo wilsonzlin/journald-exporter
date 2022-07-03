@@ -231,7 +231,18 @@ func main() {
 			time.Sleep(delay)
 
 			mutex.Lock()
-			entryCount := len(entriesBatch)
+			entryCount := 0
+			contentLength := 0
+			for _, e := range entriesBatch {
+				// Approximate byte count of other parts of the JSON object as 512 bytes.
+				entryByteSize := len(*e.Data) + 512
+				// The PutLogs API has a Content-Length limit of 11 MiB.
+				if contentLength+entryByteSize > 11534336 {
+					break
+				}
+				entryCount++
+				contentLength += entryByteSize
+			}
 			mutex.Unlock()
 			if entryCount == 0 {
 				delay = MIN_DELAY
