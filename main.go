@@ -259,7 +259,7 @@ func main() {
 				if delay > MAX_DELAY {
 					delay = MAX_DELAY
 				}
-				fmt.Fprintf(os.Stderr, "Failed to PutLogs: %s", err)
+				fmt.Fprintf(os.Stderr, "Failed to PutLogs: %s\n", err)
 			} else {
 				delay = MIN_DELAY
 				if stateDb != nil {
