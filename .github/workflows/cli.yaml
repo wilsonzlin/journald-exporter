@@ -1,0 +1,34 @@
+name: Build and upload CLI
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  cli:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo ::set-output name=VERSION::"$([[ "$GITHUB_REF" == refs/tags/v* ]] && echo ${GITHUB_REF#refs/tags/v} || echo '0.0.0')"
+
+      - name: Set up Backblaze B2 CLI
+        uses: wilsonzlin/setup-b2@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '>=1.17.0'
+
+      - name: Build CLI
+        run: |
+          b2 authorize-account ${{ secrets.B2_KEY_ID }} ${{ secrets.B2_APPLICATION_KEY }}
+          GOOS=linux GOARCH=amd64 ./build
+          b2 upload-file ${{ secrets.B2_BUCKET_NAME }} journald-exporter-oci journald-exporter-oci/${{ steps.version.outputs.VERSION }}/linux/amd64
+          GOOS=linux GOARCH=arm64 ./build
+          b2 upload-file ${{ secrets.B2_BUCKET_NAME }} journald-exporter-oci journald-exporter-oci/${{ steps.version.outputs.VERSION }}/linux/arm64
