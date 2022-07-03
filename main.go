@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/jessevdk/go-flags"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/oracle/oci-go-sdk/common"
 	"github.com/oracle/oci-go-sdk/common/auth"
 	"github.com/oracle/oci-go-sdk/loggingingestion"
@@ -159,41 +157,20 @@ func main() {
 	var args struct {
 		LogOcid      string `long:"log-ocid"`
 		InstanceOcid string `long:"instance-ocid"`
-		State        string `long:"state"`
+		StateDir     string `long:"state-dir"`
 	}
 	_, err := flags.ParseArgs(&args, os.Args[1:])
 	if err != nil {
 		panic(err)
 	}
 
-	// We use SQLite3 for safer consistent writes.
-	// We use "instance" because we need a PK, even though we'll only ever have one row.
-	var stateDb *sql.DB
-	if args.State != "" {
-		stateDb, err = sql.Open("sqlite3", args.State)
-		if err != nil {
-			panic(err)
-		}
-		defer stateDb.Close()
-		_, err = stateDb.Exec(`
-			create table if not exists exported (
-				instance text not null,
-				last_cursor text not null,
-				primary key (instance)
-			);
-		`)
-		if err != nil {
-			panic(err)
-		}
-	}
-
 	var afterCursor string
-	if stateDb != nil {
-		row := stateDb.QueryRow("select last_cursor from exported where instance = ?", args.InstanceOcid)
-		err = row.Scan(&afterCursor)
-		if err != nil && err != sql.ErrNoRows {
+	if args.StateDir != "" {
+		raw, err := os.ReadFile(fmt.Sprintf("%s/after.cursor", args.StateDir))
+		if err != nil && !os.IsNotExist(err) {
 			panic(err)
 		}
+		afterCursor = string(raw)
 	}
 
 	jctlargs := make([]string, 0)
@@ -273,8 +250,12 @@ func main() {
 				}
 			} else {
 				delay = MIN_DELAY
-				if stateDb != nil {
-					_, err = stateDb.Exec("insert into exported (instance, last_cursor) values (?, ?) on conflict (instance) do update set last_cursor = excluded.last_cursor", args.InstanceOcid, entriesBatch[entryCount-1].Id)
+				if args.StateDir != "" {
+					err := os.WriteFile(fmt.Sprintf("%s/after.cursor.tmp", args.StateDir), []byte(*entriesBatch[entryCount-1].Id), 0o400)
+					if err != nil {
+						panic(err)
+					}
+					err = os.Rename(fmt.Sprintf("%s/after.cursor.tmp", args.StateDir), fmt.Sprintf("%s/after.cursor", args.StateDir))
 					if err != nil {
 						panic(err)
 					}
