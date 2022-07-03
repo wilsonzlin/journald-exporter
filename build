@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -Eeuxo pipefail
+
+pushd "$(dirname "$0")" >/dev/null
+
+go build -o journald-exporter-oci
+
+popd >/dev/null
