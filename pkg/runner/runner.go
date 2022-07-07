@@ -44,7 +44,7 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 	entry := make(map[string]string)
 	var fieldName string
 	state := ParseStateName
-	stateExpectedBytes := -1
+	var stateExpectedBytes *uint64 = nil
 	var stateGotBytes []byte
 	push := func(chunk []byte) {
 		stateGotBytes = append(stateGotBytes, chunk...)
@@ -69,7 +69,7 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 				if posOfLf == 0 && len(stateGotBytes) == 0 {
 					// Entry ended.
 					assertState(len(fieldName) == 0)
-					assertState(stateExpectedBytes == -1)
+					assertState(stateExpectedBytes == nil)
 					onEntry(entry)
 					clearMap(entry)
 					chunk = chunk[1:]
@@ -99,8 +99,7 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 					break
 				}
 				chunk = takeAll()
-				var stateExpectedBytes uint64
-				err = binary.Read(bytes.NewReader(chunk), binary.LittleEndian, &stateExpectedBytes)
+				err = binary.Read(bytes.NewReader(chunk), binary.LittleEndian, stateExpectedBytes)
 				if err != nil {
 					panic(err)
 				}
@@ -108,7 +107,7 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 				chunk = chunk[8:]
 			} else if state == ParseStateValue {
 				var value []byte
-				if stateExpectedBytes == -1 {
+				if stateExpectedBytes == nil {
 					posOfLf := indexOf(chunk, '\n')
 					if posOfLf == -1 {
 						// Still in value.
@@ -121,18 +120,18 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 				} else {
 					push(chunk)
 					// Binary value also ends with LF.
-					if len(stateGotBytes) < stateExpectedBytes+1 {
+					if uint64(len(stateGotBytes)) < *stateExpectedBytes+1 {
 						// Still in value.
 						break
 					}
 					chunk = takeAll()
-					assertState(chunk[stateExpectedBytes] == '\n')
-					value = chunk[0:stateExpectedBytes]
-					chunk = chunk[stateExpectedBytes+1:]
+					assertState(chunk[*stateExpectedBytes] == '\n')
+					value = chunk[0:*stateExpectedBytes]
+					chunk = chunk[*stateExpectedBytes+1:]
 				}
 				entry[fieldName] = string(value)
 				state = ParseStateName
-				stateExpectedBytes = -1
+				stateExpectedBytes = nil
 				fieldName = ""
 			}
 		}
