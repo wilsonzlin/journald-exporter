@@ -29,6 +29,6 @@ jobs:
         run: |
           b2 authorize-account ${{ secrets.B2_KEY_ID }} ${{ secrets.B2_APPLICATION_KEY }}
           GOOS=linux GOARCH=amd64 ./build
-          b2 upload-file ${{ secrets.B2_BUCKET_NAME }} journald-exporter-oci journald-exporter-oci/${{ steps.version.outputs.VERSION }}/linux/amd64
+          b2 sync --compareVersions size ./dist/ b2://${{ secrets.B2_BUCKET_NAME }}/journald-exporter/${{ steps.version.outputs.VERSION }}/linux/x86_64/
           GOOS=linux GOARCH=arm64 ./build
-          b2 upload-file ${{ secrets.B2_BUCKET_NAME }} journald-exporter-oci journald-exporter-oci/${{ steps.version.outputs.VERSION }}/linux/arm64
+          b2 sync --compareVersions size ./dist/ b2://${{ secrets.B2_BUCKET_NAME }}/journald-exporter/${{ steps.version.outputs.VERSION }}/linux/aarch64/

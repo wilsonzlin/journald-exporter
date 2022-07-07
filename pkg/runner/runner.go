@@ -1,22 +1,14 @@
-package main
+package runner
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strconv"
-	"sync"
 	"time"
-
-	"github.com/jessevdk/go-flags"
-	"github.com/oracle/oci-go-sdk/common"
-	"github.com/oracle/oci-go-sdk/common/auth"
-	"github.com/oracle/oci-go-sdk/loggingingestion"
 )
 
 type ParseState int
@@ -153,20 +145,10 @@ type EntryData struct {
 	Priority uint64            `json:"priority"`
 }
 
-func main() {
-	var args struct {
-		LogOcid      string `long:"log-ocid"`
-		InstanceOcid string `long:"instance-ocid"`
-		StateDir     string `long:"state-dir"`
-	}
-	_, err := flags.ParseArgs(&args, os.Args[1:])
-	if err != nil {
-		panic(err)
-	}
-
+func StreamJournaldEntries(stateDir string, onEntryData func(timestamp time.Time, id string, entryData EntryData)) {
 	var afterCursor string
-	if args.StateDir != "" {
-		raw, err := os.ReadFile(fmt.Sprintf("%s/after.cursor", args.StateDir))
+	if stateDir != "" {
+		raw, err := os.ReadFile(fmt.Sprintf("%s/after.cursor", stateDir))
 		if err != nil && !os.IsNotExist(err) {
 			panic(err)
 		}
@@ -191,88 +173,13 @@ func main() {
 		panic(err)
 	}
 
-	provider, err := auth.InstancePrincipalConfigurationProvider()
-	if err != nil {
-		panic(err)
-	}
-	client, err := loggingingestion.NewLoggingClientWithConfigurationProvider(provider)
-	var entriesBatch []loggingingestion.LogEntry
-	var mutex sync.Mutex
-
-	go func() {
-		// Don't delay too long as it could cause growing backlog if logs are on fire.
-		MIN_DELAY := 2 * time.Second
-		MAX_DELAY := 1 * time.Minute
-		delay := MIN_DELAY
-		for {
-			time.Sleep(delay)
-
-			mutex.Lock()
-			entryCount := 0
-			contentLength := 0
-			for _, e := range entriesBatch {
-				// Approximate byte count of other parts of the JSON object as 512 bytes.
-				entryByteSize := len(*e.Data) + 512
-				// The PutLogs API has a Content-Length limit of 11 MiB.
-				if contentLength+entryByteSize > 11534336 {
-					break
-				}
-				entryCount++
-				contentLength += entryByteSize
-			}
-			mutex.Unlock()
-			if entryCount == 0 {
-				delay = MIN_DELAY
-				continue
-			}
-			req := loggingingestion.PutLogsRequest{
-				PutLogsDetails: loggingingestion.PutLogsDetails{
-					LogEntryBatches: []loggingingestion.LogEntryBatch{
-						{
-							Defaultlogentrytime: &common.SDKTime{Time: time.Now()},
-							Entries:             entriesBatch[:entryCount],
-							Source:              common.String(args.InstanceOcid),
-							Type:                common.String("journald"),
-						},
-					},
-					Specversion: common.String("1.0"),
-				},
-				LogId: common.String(args.LogOcid),
-			}
-
-			// Send the request using the service client
-			_, err = client.PutLogs(context.Background(), req)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to PutLogs %d entries: %s\n", entryCount, err)
-				delay = delay * 2
-				if delay > MAX_DELAY {
-					delay = MAX_DELAY
-				}
-			} else {
-				delay = MIN_DELAY
-				if args.StateDir != "" {
-					err := os.WriteFile(fmt.Sprintf("%s/after.cursor.tmp", args.StateDir), []byte(*entriesBatch[entryCount-1].Id), 0o400)
-					if err != nil {
-						panic(err)
-					}
-					err = os.Rename(fmt.Sprintf("%s/after.cursor.tmp", args.StateDir), fmt.Sprintf("%s/after.cursor", args.StateDir))
-					if err != nil {
-						panic(err)
-					}
-				}
-				mutex.Lock()
-				entriesBatch = entriesBatch[entryCount:]
-				mutex.Unlock()
-			}
-		}
-	}()
-
 	journaldExportParser(jctlOut, func(entryRaw map[string]string) {
 		entryTimestampUsRaw, err := strconv.ParseInt(entryRaw["__REALTIME_TIMESTAMP"], 10, 64)
 		if err != nil {
 			panic(err)
 		}
 		delete(entryRaw, "__REALTIME_TIMESTAMP")
+		timestamp := time.UnixMicro(entryTimestampUsRaw)
 
 		id := entryRaw["__CURSOR"]
 		delete(entryRaw, "__CURSOR")
@@ -304,18 +211,6 @@ func main() {
 			Priority: priority,
 		}
 
-		entryJson, err := json.Marshal(entryData)
-		if err != nil {
-			panic(err)
-		}
-
-		entry := loggingingestion.LogEntry{
-			Data: common.String(string(entryJson)),
-			Id:   common.String(id),
-			Time: &common.SDKTime{Time: time.Unix(entryTimestampUsRaw/1e6, (entryTimestampUsRaw%1e6)*1e3)},
-		}
-		mutex.Lock()
-		entriesBatch = append(entriesBatch, entry)
-		mutex.Unlock()
+		onEntryData(timestamp, id, entryData)
 	})
 }
