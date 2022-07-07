@@ -43,7 +43,8 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 	entry := make(map[string]string)
 	var fieldName string
 	state := ParseStateName
-	var stateExpectedBytes *uint64 = nil
+	var stateExpectedBytes uint64
+	stateExpectedBytesIsDefined := false
 	var stateGotBytes []byte
 	push := func(chunk []byte) {
 		stateGotBytes = append(stateGotBytes, chunk...)
@@ -68,7 +69,7 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 				if posOfLf == 0 && len(stateGotBytes) == 0 {
 					// Entry ended.
 					assertState(len(fieldName) == 0)
-					assertState(stateExpectedBytes == nil)
+					assertState(!stateExpectedBytesIsDefined)
 					onEntry(entry)
 					clearMap(entry)
 					chunk = chunk[1:]
@@ -98,12 +99,13 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 					break
 				}
 				chunk = takeAll()
-				*stateExpectedBytes = binary.LittleEndian.Uint64(chunk)
+				stateExpectedBytes = binary.LittleEndian.Uint64(chunk)
+				stateExpectedBytesIsDefined = true
 				state = ParseStateValue
 				chunk = chunk[8:]
 			} else if state == ParseStateValue {
 				var value []byte
-				if stateExpectedBytes == nil {
+				if !stateExpectedBytesIsDefined {
 					posOfLf := indexOf(chunk, '\n')
 					if posOfLf == -1 {
 						// Still in value.
@@ -116,18 +118,18 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 				} else {
 					push(chunk)
 					// Binary value also ends with LF.
-					if uint64(len(stateGotBytes)) < *stateExpectedBytes+1 {
+					if uint64(len(stateGotBytes)) < stateExpectedBytes+1 {
 						// Still in value.
 						break
 					}
 					chunk = takeAll()
-					assertState(chunk[*stateExpectedBytes] == '\n')
-					value = chunk[0:*stateExpectedBytes]
-					chunk = chunk[*stateExpectedBytes+1:]
+					assertState(chunk[stateExpectedBytes] == '\n')
+					value = chunk[0:stateExpectedBytes]
+					chunk = chunk[stateExpectedBytes+1:]
 				}
 				entry[fieldName] = string(value)
 				state = ParseStateName
-				stateExpectedBytes = nil
+				stateExpectedBytesIsDefined = false
 				fieldName = ""
 			}
 		}
