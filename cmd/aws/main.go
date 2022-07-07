@@ -11,14 +11,14 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/jessevdk/go-flags"
-	"github.com/wilsonzlin/journald-exporter-oci/pkg/runner"
+	"github.com/wilsonzlin/journald-exporter/pkg/runner"
 )
 
 func main() {
 	var args struct {
-		LogGroup      string `long:"log-group"`
-		LogStream      string `long:"log-stream"`
-		StateDir     string `long:"state-dir"`
+		LogGroup  string `long:"log-group"`
+		LogStream string `long:"log-stream"`
+		StateDir  string `long:"state-dir"`
 	}
 	_, err := flags.ParseArgs(&args, os.Args[1:])
 	if err != nil {
@@ -62,10 +62,10 @@ func main() {
 				continue
 			}
 			res, err := client.PutLogEvents(&cloudwatchlogs.PutLogEventsInput{
-				LogGroupName: &args.LogStream,
+				LogGroupName:  &args.LogStream,
 				LogStreamName: &args.LogStream,
 				SequenceToken: &sequenceToken,
-				LogEvents: entriesBatchEvents[:entryCount],
+				LogEvents:     entriesBatchEvents[:entryCount],
 			})
 
 			if err != nil {
@@ -105,7 +105,7 @@ func main() {
 		}
 
 		entry := cloudwatchlogs.InputLogEvent{
-			Message: aws.String(string(entryJson)),
+			Message:   aws.String(string(entryJson)),
 			Timestamp: aws.Int64(timestamp.UnixMilli()),
 		}
 		mutex.Lock()

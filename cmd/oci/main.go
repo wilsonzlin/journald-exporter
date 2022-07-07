@@ -12,7 +12,7 @@ import (
 	"github.com/oracle/oci-go-sdk/common"
 	"github.com/oracle/oci-go-sdk/common/auth"
 	"github.com/oracle/oci-go-sdk/loggingingestion"
-	"github.com/wilsonzlin/journald-exporter-oci/pkg/runner"
+	"github.com/wilsonzlin/journald-exporter/pkg/runner"
 )
 
 func main() {

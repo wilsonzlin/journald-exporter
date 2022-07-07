@@ -1,4 +1,4 @@
-module github.com/wilsonzlin/journald-exporter-oci
+module github.com/wilsonzlin/journald-exporter
 
 go 1.17
 
