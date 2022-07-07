@@ -39,7 +39,8 @@ func main() {
 		MIN_DELAY := 2 * time.Second
 		MAX_DELAY := 1 * time.Minute
 		delay := MIN_DELAY
-		var sequenceToken string
+		// The minimum length is 1.
+		sequenceToken := "0"
 		for {
 			time.Sleep(delay)
 
@@ -62,7 +63,7 @@ func main() {
 				continue
 			}
 			res, err := client.PutLogEvents(&cloudwatchlogs.PutLogEventsInput{
-				LogGroupName:  &args.LogStream,
+				LogGroupName:  &args.LogGroup,
 				LogStreamName: &args.LogStream,
 				SequenceToken: &sequenceToken,
 				LogEvents:     entriesBatchEvents[:entryCount],
