@@ -70,13 +70,14 @@ func main() {
 			})
 
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to PutLogs %d entries: %s\n", entryCount, err)
-				delay = delay * 2
-				if delay > MAX_DELAY {
-					delay = MAX_DELAY
-				}
 				if t, ok := err.(*cloudwatchlogs.InvalidSequenceTokenException); ok {
 					sequenceToken = *t.ExpectedSequenceToken
+				} else {
+					fmt.Fprintf(os.Stderr, "Failed to PutLogs %d entries: %s\n", entryCount, err)
+					delay = delay * 2
+					if delay > MAX_DELAY {
+						delay = MAX_DELAY
+					}
 				}
 			} else {
 				sequenceToken = *res.NextSequenceToken
