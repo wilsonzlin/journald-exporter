@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -99,10 +98,7 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 					break
 				}
 				chunk = takeAll()
-				err = binary.Read(bytes.NewReader(chunk), binary.LittleEndian, stateExpectedBytes)
-				if err != nil {
-					panic(err)
-				}
+				*stateExpectedBytes = binary.LittleEndian.Uint64(chunk)
 				state = ParseStateValue
 				chunk = chunk[8:]
 			} else if state == ParseStateValue {
