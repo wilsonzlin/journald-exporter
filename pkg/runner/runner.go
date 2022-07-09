@@ -26,7 +26,11 @@ type SystemdCursor struct {
 func parseSystemdCursor(raw string) (res SystemdCursor) {
 	for _, e := range strings.Split(raw, ";") {
 		posOfEq := strings.IndexRune(e, '=')
-		v, err := hex.DecodeString(e[posOfEq+1:])
+		vRaw := e[posOfEq+1:]
+		if len(vRaw)%2 == 1 {
+			vRaw = "0" + vRaw
+		}
+		v, err := hex.DecodeString(vRaw)
 		if err != nil {
 			panic(err)
 		}
