@@ -137,6 +137,7 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 }
 
 type EntryData struct {
+	Id       string            `json:"id"`
 	Field    map[string]string `json:"field"`
 	Message  string            `json:"message"`
 	Priority uint64            `json:"priority"`
@@ -203,6 +204,7 @@ func StreamJournaldEntries(stateDir string, onEntryData func(timestamp time.Time
 		delete(entryRaw, "_SOURCE_REALTIME_TIMESTAMP")
 
 		entryData := EntryData{
+			Id:       id,
 			Field:    entryRaw,
 			Message:  message,
 			Priority: priority,
