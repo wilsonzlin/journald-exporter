@@ -31,7 +31,7 @@ func main() {
 	client := cloudwatchlogs.New(sess)
 
 	var mutex sync.Mutex
-	var entriesBatchIds []string
+	var entriesBatchCursors []string
 	var entriesBatchEvents []*cloudwatchlogs.InputLogEvent
 
 	go func() {
@@ -83,7 +83,7 @@ func main() {
 				sequenceToken = *res.NextSequenceToken
 				delay = MIN_DELAY
 				if args.StateDir != "" {
-					err := os.WriteFile(fmt.Sprintf("%s/after.cursor.tmp", args.StateDir), []byte(entriesBatchIds[entryCount-1]), 0o400)
+					err := os.WriteFile(fmt.Sprintf("%s/after.cursor.tmp", args.StateDir), []byte(entriesBatchCursors[entryCount-1]), 0o400)
 					if err != nil {
 						panic(err)
 					}
@@ -93,14 +93,14 @@ func main() {
 					}
 				}
 				mutex.Lock()
-				entriesBatchIds = entriesBatchIds[entryCount:]
+				entriesBatchCursors = entriesBatchCursors[entryCount:]
 				entriesBatchEvents = entriesBatchEvents[entryCount:]
 				mutex.Unlock()
 			}
 		}
 	}()
 
-	runner.StreamJournaldEntries(args.StateDir, func(timestamp time.Time, id string, entryData runner.EntryData) {
+	runner.StreamJournaldEntries(args.StateDir, func(timestamp time.Time, cursor string, entryData runner.EntryData) {
 		entryJson, err := json.Marshal(entryData)
 		if err != nil {
 			panic(err)
@@ -111,7 +111,7 @@ func main() {
 			Timestamp: aws.Int64(timestamp.UnixMilli()),
 		}
 		mutex.Lock()
-		entriesBatchIds = append(entriesBatchIds, id)
+		entriesBatchCursors = append(entriesBatchCursors, cursor)
 		entriesBatchEvents = append(entriesBatchEvents, &entry)
 		mutex.Unlock()
 	})

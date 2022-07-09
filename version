@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -Eeuxo pipefail
+shopt -s globstar
+shopt -s nullglob
+
+echo "$1" > version.txt
+git add -A
+git commit -m "v$1"
+git tag -a "v$1" -m ''
+git push -u origin HEAD

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+set -Eeuxo pipefail
+shopt -s globstar
+shopt -s nullglob
+
+for f in **/*.go; do
+  pushd "$(dirname "$f")"
+  go fmt "$(basename "$f")"
+  popd
+done

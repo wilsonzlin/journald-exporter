@@ -103,7 +103,7 @@ func main() {
 		}
 	}()
 
-	runner.StreamJournaldEntries(args.StateDir, func(timestamp time.Time, id string, entryData runner.EntryData) {
+	runner.StreamJournaldEntries(args.StateDir, func(timestamp time.Time, cursor string, entryData runner.EntryData) {
 		entryJson, err := json.Marshal(entryData)
 		if err != nil {
 			panic(err)
@@ -111,7 +111,7 @@ func main() {
 
 		entry := loggingingestion.LogEntry{
 			Data: common.String(string(entryJson)),
-			Id:   common.String(id),
+			Id:   common.String(entryData.Id),
 			Time: &common.SDKTime{Time: timestamp},
 		}
 		mutex.Lock()
