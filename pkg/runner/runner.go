@@ -1,14 +1,52 @@
 package runner
 
 import (
+	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 )
+
+type SystemdCursor struct {
+	seqnumId  []byte
+	seqnum    []byte
+	bootId    []byte
+	monotonic []byte
+	realtime  []byte
+	xorHash   []byte
+}
+
+// Derived from sd_journal_get_cursor.
+func parseSystemdCursor(raw string) (res SystemdCursor) {
+	for _, e := range strings.Split(raw, ";") {
+		posOfEq := strings.IndexRune(e, '=')
+		v, err := hex.DecodeString(e[posOfEq+1:])
+		if err != nil {
+			panic(err)
+		}
+		switch e[:posOfEq] {
+		case "s":
+			res.seqnumId = v
+		case "i":
+			res.seqnum = v
+		case "b":
+			res.bootId = v
+		case "m":
+			res.monotonic = v
+		case "t":
+			res.realtime = v
+		case "x":
+			res.xorHash = v
+		}
+	}
+	return
+}
 
 type ParseState int
 
@@ -137,13 +175,26 @@ func journaldExportParser(o io.ReadCloser, onEntry func(entry map[string]string)
 }
 
 type EntryData struct {
+	// A unique, lexicographically-sortable URL-safe ID for this entry, derived from (but not the same as) the journald entry cursor.
 	Id       string            `json:"id"`
 	Field    map[string]string `json:"field"`
 	Message  string            `json:"message"`
 	Priority uint64            `json:"priority"`
 }
 
-func StreamJournaldEntries(stateDir string, onEntryData func(timestamp time.Time, id string, entryData EntryData)) {
+func ok(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func ok2(n int, err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func StreamJournaldEntries(stateDir string, onEntryData func(timestamp time.Time, cursor string, entryData EntryData)) {
 	var afterCursor string
 	if stateDir != "" {
 		raw, err := os.ReadFile(fmt.Sprintf("%s/after.cursor", stateDir))
@@ -179,8 +230,21 @@ func StreamJournaldEntries(stateDir string, onEntryData func(timestamp time.Time
 		delete(entryRaw, "__REALTIME_TIMESTAMP")
 		timestamp := time.UnixMicro(entryTimestampUsRaw)
 
-		id := entryRaw["__CURSOR"]
+		cursorRaw := entryRaw["__CURSOR"]
 		delete(entryRaw, "__CURSOR")
+		cursor := parseSystemdCursor(cursorRaw)
+		// Only seqnumId and seqnum should be needed for uniquely identifying an entry: https://systemd.io/JOURNAL_FILE_FORMAT/.
+		// We don't use the whole cursor as it's not lexicographically ordered, so while we can use as ID we can't use as tiebreaker for when two entries have the same timestamp.
+		// We need seqnumId to be a fixed length as we're concatenating it with seqnum without any delimiter.
+		if len(cursor.seqnumId) != 16 {
+			panic(fmt.Errorf("got journald entry cursor with %d-byte seqnumId", len(cursor.seqnumId)))
+		}
+		idBuf := new(strings.Builder)
+		idEncoder := base64.NewEncoder(base64.RawURLEncoding, idBuf)
+		ok2(idEncoder.Write(cursor.seqnumId))
+		ok2(idEncoder.Write(cursor.seqnum))
+		ok(idEncoder.Close())
+		id := idBuf.String()
 
 		priorityRaw, exists := entryRaw["PRIORITY"]
 		if !exists {
@@ -210,6 +274,6 @@ func StreamJournaldEntries(stateDir string, onEntryData func(timestamp time.Time
 			Priority: priority,
 		}
 
-		onEntryData(timestamp, id, entryData)
+		onEntryData(timestamp, cursorRaw, entryData)
 	})
 }
