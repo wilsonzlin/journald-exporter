@@ -105,10 +105,13 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		// AWS has a limit of 262144 bytes per event. Allow 50 characters for the timestamp and JSON syntax.
+		if len(entryJson) > 262144-50 {
+			entryJson = entryJson[:262144-50]
+		}
 
 		entry := cloudwatchlogs.InputLogEvent{
-			// AWS has a limit of 262144 bytes per event. Allow 50 characters for the timestamp and JSON syntax.
-			Message:   aws.String(string(entryJson[:262144 - 50])),
+			Message:   aws.String(string(entryJson)),
 			Timestamp: aws.Int64(timestamp.UnixMilli()),
 		}
 		mutex.Lock()
