@@ -49,7 +49,7 @@ func main() {
 			contentLength := 0
 			for _, e := range entriesBatchEvents {
 				// AWS adds 26 bytes to each event, and there are also other JSON properties as well as the JSON syntax itself.
-				entryByteSize := len(*e.Message) + 40
+				entryByteSize := len(*e.Message) + 50
 				// The API has a Content-Length limit of 1 MiB and a batch size limit of 10,000.
 				if contentLength+entryByteSize > 1048576 || entryCount == 10000 {
 					break
@@ -107,7 +107,8 @@ func main() {
 		}
 
 		entry := cloudwatchlogs.InputLogEvent{
-			Message:   aws.String(string(entryJson)),
+			// AWS has a limit of 262144 bytes per event. Allow 50 characters for the timestamp and JSON syntax.
+			Message:   aws.String(string(entryJson[:262144 - 50])),
 			Timestamp: aws.Int64(timestamp.UnixMilli()),
 		}
 		mutex.Lock()
