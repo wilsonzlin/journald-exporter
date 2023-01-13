@@ -41,7 +41,7 @@ While the process is running, journald entries will be streamed and uploaded to 
 
 Only warning and error messages will be omitted; nothing is shown when idle, transferring, or successful.
 
-The process can be safely killed/interrupted at any time; restarting the process with the same arguments will resume where it left off and not cause any entries to be lost. However, it's strongly recommended to configure journald itself to store all logs persistently and rotate sparingly, to avoid journald from losing messages (e.g. when rebooting or out of disk space).
+The process can be safely killed/interrupted at any time; restarting the process with the same arguments will resume where it left off and not cause any entries to be lost. However, it's strongly recommended to configure journald itself to store all logs persistently and rotate sparingly, to avoid journald from losing messages (e.g. when rebooting or out of disk space). See the man page for [journald.conf(5)](https://www.freedesktop.org/software/systemd/man/journald.conf.html) for more details.
 
 ## Background service
 
